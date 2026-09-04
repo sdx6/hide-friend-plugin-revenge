@@ -1,130 +1,112 @@
-import { findByName, findByProps } from 
-"@vendetta/metro"; import { after } from 
-"@vendetta/patcher"; import { findInReactTree } 
-from "@vendetta/utils"; let unpatches: (() => 
-void)[] = []; export default {
+import { findByName, findByProps } from "@vendetta/metro";
+import { after } from "@vendetta/patcher";
+import { findInReactTree } from "@vendetta/utils";
+
+let unpatches: (() => void)[] = [];
+
+export default {
     onLoad: () => {
-        // Find all known modules that wrap the 
-        // profile action buttons
-        const ActionModules = [ 
-            findByName("UserProfilePrimaryActions", 
-            false), 
-            findByName("BiteSizeProfilePopout", 
-            false), 
-            findByName("UserProfilePopout", 
-            false), 
-            findByName("UserProfileHeaderPrimaryActions", 
-            false)
-        ]; for (const Module of ActionModules) { 
-            if (!Module) continue; try {
-                // Hook the default export of 
-                // the React component
-                const patch = after("default", 
-                Module, (args: any, res: any) => 
-                {
-                    if (!res || !res.props) 
-                    return;
-                    // Recursive function to 
-                    // strip the button before 
-                    // it renders
-                    const prune = (node: any) => 
-                    {
-                        if (!node || 
-                        !node.props) return;
+        console.log("[HideAddFriend] Plugin is loading...");
+
+        // STRATEGY 1: Directly intercept known friend action components and return null
+        const FriendAction = findByProps("UserProfileFriendAction");
+        if (FriendAction && typeof FriendAction.UserProfileFriendAction === "function") {
+            console.log("[HideAddFriend] Found UserProfileFriendAction module, patching directly.");
+            unpatches.push(after("UserProfileFriendAction", FriendAction, () => {
+                console.log("[HideAddFriend] Intercepted UserProfileFriendAction render, returning null.");
+                return null;
+            }));
+        } else {
+            console.log("[HideAddFriend] UserProfileFriendAction module not found.");
+        }
+
+        const AddFriendButton = findByName("AddFriendButton", false);
+        if (AddFriendButton) {
+            console.log("[HideAddFriend] Found AddFriendButton component, patching.");
+            unpatches.push(after("default", AddFriendButton, () => {
+                console.log("[HideAddFriend] Intercepted AddFriendButton render, returning null.");
+                return null;
+            }));
+        }
+
+        // STRATEGY 2: Intercept all possible profile wrapper layouts
+        const ActionModules = [
+            { name: "UserProfilePrimaryActions", mod: findByName("UserProfilePrimaryActions", false) },
+            { name: "BiteSizeProfilePopout", mod: findByName("BiteSizeProfilePopout", false) },
+            { name: "UserProfilePopout", mod: findByName("UserProfilePopout", false) },
+            { name: "UserProfileHeaderPrimaryActions", mod: findByName("UserProfileHeaderPrimaryActions", false) },
+            { name: "GuildUserProfilePrimaryActions", mod: findByName("GuildUserProfilePrimaryActions", false) }
+        ];
+
+        for (const { name, mod } of ActionModules) {
+            if (!mod) {
+                console.log(`[HideAddFriend] Module not found: ${name}`);
+                continue;
+            }
+
+            console.log(`[HideAddFriend] Successfully hooked module: ${name}`);
+
+            try {
+                const patch = after("default", mod, (args: any, res: any) => {
+                    if (!res) {
+                        console.log(`[HideAddFriend] Render result for ${name} was empty/null.`);
+                        return;
+                    }
+
+                    let removedCount = 0;
+
+                    const prune = (node: any) => {
+                        if (!node?.props) return;
                         
-                        if 
-                        (Array.isArray(node.props.children)) 
-                        {
-                            // Filter out the 
-                            // button from 
-                            // arrays
-                            node.props.children 
-                            = 
-                            node.props.children.filter((child: 
-                            any) => {
-                                const 
-                                hasAddFriend = 
-                                findInReactTree(child, 
-                                (n: any) =>
-                                    n?.icon === 
-                                    "AddFriendIcon" 
-                                    ||
-                                    n?.text === 
-                                    "Add Friend" 
-                                    ||
-                                    n?.actionType 
-                                    === 
-                                    "ADD_FRIEND" 
-                                    ||
-                                    n?.label === 
-                                    "Add Friend"
-                                ); return 
-                                !hasAddFriend;
+                        if (Array.isArray(node.props.children)) {
+                            node.props.children = node.props.children.filter((child: any) => {
+                                const isFriendButton = findInReactTree(child, (n: any) => {
+                                    if (!n) return false;
+                                    
+                                    const type = typeof n.actionType === "string" ? n.actionType : "";
+                                    const icon = typeof n.icon === "string" ? n.icon : (typeof n.source === "string" ? n.source : "");
+                                    const text = typeof n.text === "string" ? n.text : (typeof n.label === "string" ? n.label : "");
+                                    
+                                    const matched = type.includes("ADD_FRIEND") || 
+                                                    icon.includes("AddFriend") || 
+                                                    text.includes("Add Friend") || 
+                                                    text.includes("Send Friend Request");
+                                    
+                                    if (matched) {
+                                        console.log(`[HideAddFriend] Match found! Type: "${type}", Icon: "${icon}", Text: "${text}"`);
+                                    }
+                                    return matched;
+                                });
+
+                                if (isFriendButton) {
+                                    removedCount++;
+                                    return false; // Filter it out
+                                }
+                                return true;
                             });
-                            // Keep searching 
-                            // recursively down 
-                            // the remaining 
-                            // children
+                            
                             node.props.children.forEach(prune);
-                        } else if 
-                        } (node.props.children) 
-                        } {
-                            // If it's a single 
-                            // child, check it 
-                            // directly
-                            const hasAddFriend = 
-                            findInReactTree(node.props.children, 
-                            (n: any) =>
-                                n?.icon === 
-                                "AddFriendIcon" 
-                                ||
-                                n?.text === "Add 
-                                Friend" || 
-                                n?.actionType 
-                                === "ADD_FRIEND"
-                            ); if (hasAddFriend) 
-                            {
-                                node.props.children 
-                                = null; // 
-                                Nullify it 
-                                completely
-                            } else {
-                                prune(node.props.children); 
-                                // Dig deeper
-                            }
+                        } else if (node.props.children) {
+                            prune(node.props.children);
                         }
                     };
+
                     prune(res);
+                    if (removedCount > 0) {
+                        console.log(`[HideAddFriend] Successfully pruned ${removedCount} button(s) from ${name}`);
+                    }
                 });
-                
                 unpatches.push(patch);
             } catch (e) {
-                console.error("Failed to apply 
-                patch to module:", e);
+                console.error(`[HideAddFriend] Failed to patch module ${name}:`, e);
             }
-        }
-        
-        // Direct strike: If the modern 
-        // FriendAction module itself is found, 
-        // force it to return null globally
-        const FriendAction = 
-        findByProps("UserProfileFriendAction"); 
-        if (FriendAction && typeof 
-        FriendAction.UserProfileFriendAction === 
-        "function") {
-            unpatches.push( 
-                after("UserProfileFriendAction", 
-                FriendAction, () => null)
-            );
         }
     },
     
     onUnload: () => {
-        // Clean up all patches instantly when 
-        // the plugin is toggled off
-        for (const unpatch of unpatches) { 
-            unpatch();
-        }
+        console.log("[HideAddFriend] Unloading plugin, removing all patches.");
+        for (const unpatch of unpatches) unpatch();
         unpatches = [];
     }
 }
+
