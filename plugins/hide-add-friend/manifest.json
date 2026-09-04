@@ -1,0 +1,8 @@
+{ "id": "hide-add-friend", "name": "Hide Add 
+    Friend", "description": "Surgically removes 
+    the Add Friend button from modern profile 
+    layouts.", "author": "You", "version": 
+    "1.0.0", "dist": {
+        "js": "index.js"
+    }
+}
