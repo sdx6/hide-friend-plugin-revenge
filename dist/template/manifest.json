@@ -1,1 +1,1 @@
-{"name":"Template Plugin","description":"A plugin for use as a template.","authors":[{"name":"You!","id":"YOUR_ID_HERE"}],"main":"index.js","vendetta":{"icon":"ic_badge_staff"},"hash":"2f13b9812caee28af295c66d9187ca703de01e6e0518f79ed4db715fa7d4eb59"}
+{"name":"Hide Add Friend","description":"Removes the Add Friend button from user profiles.","authors":[{"name":"Revenge community","id":"0"}],"main":"index.js","vendetta":{"icon":"ic_friends"},"hash":"4ce855902ce7e5d0464edfad2f7faddff43256ebe187d63671fdd8fd79097d6f"}
